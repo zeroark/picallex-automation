@@ -48,3 +48,6 @@ local.properties
 .scala_dependencies
 .worksheet
 /target/
+
+# Ignoring the data folder, because we don't wanna share our databases :)
+/data/
