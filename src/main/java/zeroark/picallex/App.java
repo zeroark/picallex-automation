@@ -9,62 +9,67 @@ import org.apache.logging.log4j.Logger;
 import org.apache.poi.hssf.usermodel.*;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
 
 import zeroark.picallex.entities.*;
+import zeroark.picallex.helpers.FileHelper;
 
 /**
  * Main application class
  * This will wrap up all the application logic in one single place!
  */
 public class App 
-{
-	// Getting our logger so we can start writing to the file
-	private static Logger logger = LogManager.getLogger();
+{ 				
+	// Logger we will use for this class logging
+	private final static Logger logger = LogManager.getLogger();	
+	
+	// Relative path of the file we want to read
+	private static final String filename = "data/BANCO FALABELLA.xls";
+	
+	// Relative path of the resulting CSV file 
+	private static final String resultname = "data/result.csv";
+	
+	@Autowired
+	private static FileHelper fileHelper;
+	
+	public static void InitializeApplication(){
+		// Get the application context from the configuration file
+		ApplicationContext context = new ClassPathXmlApplicationContext("Beans.xml");
+		
+		// Setup the beans that we'll use for our process here
+		fileHelper = (FileHelper) context.getBean("fileHelper");
+	}	
 	
     public static void main( String[] args )
-    {       	    	
+    {   
+    	Entry entry = null;
+		List<Entry> entries = null;
+    	
     	try
-    	{   
-    		Entry entry = null;
+    	{
+    		// Initialize our application context and beans.
+    		InitializeApplication();    	    	    		    	    		    		    		    		    		  		    
     		
-    		// Path of the file we want to open goes here. (Create a "data" folder on the project and add your test files there)
-    		String filename = "data/BANCO FALABELLA.xls";
+    		// If source file path is invalid, finish the process
+    		if(!fileHelper.IsValidFile(filename)){
+    			logger.info(String.format("Error to open %s file.", filename));
+    			return;
+    		}
     		
-    		// Path of the resulting file, after processing 
-    		String resultname = "data/result.csv";
+    		// If result file path exists, delete it
+    		if(fileHelper.IsValidFile(resultname)){
+    			File resultFile = new File(resultname);
+    			resultFile.delete();
+    		}    	    	
     		
-    		// Getting the source file and opening it
+    		// Open the source file and start reading it.
     		File file = new File(filename);
     		FileInputStream fIP = new FileInputStream(file);
     		
-    		// Getting the result file and opening it
-    		File resultFile = new File(resultname);
-    		FileInputStream rfIP = new FileInputStream(file);    		
-    		
-    		// Making sure the file exists before doing anything.
-    		if(file.isFile() && file.exists())
-    	    {
-    	    	//System.out.println("openworkbook.xlsx file open successfully.");
-    			logger.info(String.format("%s file open successfully.", filename));
-    	    }
-    	    else
-    	    {
-    	    	//System.out.println("Error to open openworkbook.xlsx file.");
-    	    	logger.info(String.format("Error to open %s file.", filename));
-    	    }
-    		
-    		// Making sure the result file exists before doing anything.
-    		if(resultFile.isFile() && resultFile.exists())
-    	    {
-    			resultFile.delete();
-    	    }
-    		
-    		// Starting the File Writer to generate the resulting CSV file
-    		FileWriter filewriter = new FileWriter(resultname);
-    		filewriter.append("Telefono,Nombre,Notas\n");    		
-    		
     		// Open the file as an Excel Workbook
-    		// TODO: Works on XLS for now only. Need to centralize logic to work for both XLS and XLSX.
+    		// TODO: Works on XLS for now only. Need to centralize logic to work for both XLS and XLSX.    		
     		HSSFWorkbook  workbook = new HSSFWorkbook (fIP);    	    
     	    
     	    //Get first sheet from the workbook
@@ -73,11 +78,11 @@ public class App
     	    // Start to iterate through all the rows!
     	    Iterator<Row> rowIterator = sheet.rowIterator();
     	    
+    	    entries = new ArrayList<Entry>();
+    	    
     	    // Do this while there's a next row, else just finish
     	    while(rowIterator.hasNext())
-    	    {
-    	    	List<Entry> entries = new ArrayList<Entry>();    	    	
-    	    	
+    	    {    	    	    	        	    	
     	    	// Getting the next row so we can continue reading
     	    	Row row = rowIterator.next();    	    	
     	    	int rowNumber = row.getRowNum();
@@ -142,23 +147,21 @@ public class App
     	    				break;
     	    		}    	    	    	    	
     	    	}
-    	    	
-    	    	filewriter.append(entry.toString());
-    	    	//logger.info(entry.toString());
+    	    	    	    	
 	    		entries.add(entry);
 	    		
 	    		if(!entry.Name.matches("^[\\p{L} .'-]+$")) logger.fatal(String.format("Row %2d has issues with the name! (Name: %s)", rowNumber, entry.Name));	    				
     	    }
     	    
-    	    // Finalizing the file writer and saving the file
-    	    filewriter.flush();
-    		filewriter.close();
+    	    fileHelper.ExportEntriesToCSV(entries, resultname);
     
     	}
     	catch(Exception ex)
     	{
+    		fileHelper.ExportEntriesToCSV(entries, resultname);
+    		
     		// If something gets wrong, write the message
-    		//System.out.println(ex.getMessage());
+    		//System.out.println(ex.getMessage());    		
     		logger.catching(ex);
     	}
     }
